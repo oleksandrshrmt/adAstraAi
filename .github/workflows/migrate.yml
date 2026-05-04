@@ -1,0 +1,50 @@
+name: Run SQL migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "migrations/**"
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: prod          # gates DATABASE_URL secret to the prod environment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Run pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          # Ensure the migrations tracking table exists
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+              filename   text        PRIMARY KEY,
+              applied_at timestamptz NOT NULL DEFAULT now()
+            );
+          SQL
+
+          # Apply each .sql file in alphabetical order, skipping already-applied ones
+          for f in $(ls migrations/*.sql | sort); do
+            fname=$(basename "$f")
+            already_run=$(psql "$DATABASE_URL" -tAc \
+              "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$fname'")
+            if [ "$already_run" = "1" ]; then
+              echo "skip: $fname (already applied)"
+            else
+              echo "apply: $fname"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+              psql "$DATABASE_URL" -tAc \
+                "INSERT INTO schema_migrations (filename) VALUES ('$fname')"
+              echo "done: $fname"
+            fi
+          done
