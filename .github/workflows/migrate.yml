@@ -33,8 +33,9 @@ jobs:
             );
           SQL
 
-          # Apply each .sql file in alphabetical order, skipping already-applied ones
-          for f in $(ls migrations/*.sql | sort); do
+          # Apply only numbered migration files (NNNN_*.sql) in order.
+          # drop.sql and other utility scripts are intentionally excluded.
+          for f in $(ls migrations/[0-9][0-9][0-9][0-9]_*.sql 2>/dev/null | sort); do
             fname=$(basename "$f")
             already_run=$(psql "$DATABASE_URL" -tAc \
               "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$fname'")
