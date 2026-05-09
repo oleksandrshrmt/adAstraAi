@@ -10,7 +10,7 @@ DROP TABLE IF EXISTS company  CASCADE;
 DROP TABLE IF EXISTS country  CASCADE;
 
 -- ── Recreate (schema identical to 0002) ──────────────────────────────────────
-CREATE TABLEeeee country (
+CREATE TABLE country (
     id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     name       text        NOT NULL,
     code       text        NOT NULL,
